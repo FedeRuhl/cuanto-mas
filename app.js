@@ -13,10 +13,17 @@
     rate: document.getElementById("rate"),
     hours: document.getElementById("hours"),
     hoursDone: document.getElementById("hoursDone"),
+    loggedToday: document.getElementById("loggedToday"),
+    loggedTodayField: document.getElementById("loggedTodayField"),
     target: document.getElementById("target"),
     resultLabel: document.getElementById("resultLabel"),
     resultValue: document.getElementById("resultValue"),
     resultHint: document.getElementById("resultHint"),
+    progress: document.getElementById("progress"),
+    progressPct: document.getElementById("progressPct"),
+    progressBar: document.getElementById("progressBar"),
+    progressFill: document.getElementById("progressFill"),
+    progressEarned: document.getElementById("progressEarned"),
     panels: document.querySelectorAll("[data-panel]"),
   };
 
@@ -205,23 +212,43 @@
     return count;
   }
 
-  function remainingBusinessDays(fromDate) {
+  function remainingBusinessDays(fromDate, options) {
+    const excludeToday = !!(options && options.excludeToday);
     const today = startOfLocalDay(fromDate);
     const year = today.getFullYear();
     const monthIndex = today.getMonth();
     const holidays = getHolidays(year);
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const startDay = today.getDate();
-    let count = 0;
+    const todayIsBusiness = isBusinessDay(today, holidays);
+    let startDay = today.getDate();
 
+    if (excludeToday && todayIsBusiness) {
+      startDay += 1;
+    }
+
+    let count = 0;
     for (let day = startDay; day <= daysInMonth; day++) {
       if (isBusinessDay(new Date(year, monthIndex, day), holidays)) count += 1;
     }
 
     return {
       count: count,
-      includesToday: isBusinessDay(today, holidays),
+      includesToday: todayIsBusiness && !excludeToday,
+      fromNextBusinessDay: excludeToday && todayIsBusiness,
     };
+  }
+
+  function isLoggedTodayChecked() {
+    return !!els.loggedToday.checked;
+  }
+
+  function syncLoggedTodayFromState(state) {
+    const todayKey = toKey(new Date());
+    els.loggedToday.checked = !!(state && state.loggedTodayDate === todayKey);
+  }
+
+  function loggedTodayStorageValue() {
+    return els.loggedToday.checked ? toKey(new Date()) : "";
   }
 
   function formatMoney(value) {
@@ -275,6 +302,7 @@
       rate: els.rate.value,
       hours: els.hours.value,
       hoursDone: els.hoursDone.value,
+      loggedTodayDate: loggedTodayStorageValue(),
       target: els.target.value,
       mode: mode,
     };
@@ -329,6 +357,40 @@
     els.resultHint.classList.add("is-hidden");
   }
 
+  function hideProgress() {
+    els.progress.classList.add("is-hidden");
+    els.progress.hidden = true;
+    els.progressFill.style.width = "0%";
+    els.progressBar.setAttribute("aria-valuenow", "0");
+    els.progressBar.removeAttribute("aria-valuetext");
+    els.progressPct.textContent = "0%";
+    els.progressEarned.textContent = "";
+  }
+
+  function showProgress(earned, targetAmount) {
+    const ratio = targetAmount > 0 ? earned / targetAmount : 0;
+    const pct = Math.round(ratio * 1000) / 10;
+    const barPct = Math.max(0, Math.min(100, pct));
+    const whole = Math.abs(pct - Math.round(pct)) < 1e-9;
+    const pctLabel = new Intl.NumberFormat("es-AR", {
+      maximumFractionDigits: whole ? 0 : 1,
+    }).format(pct);
+
+    els.progressFill.style.width = barPct + "%";
+    els.progressBar.setAttribute("aria-valuenow", String(Math.round(barPct)));
+    els.progressBar.setAttribute("aria-valuetext", pctLabel + " por ciento");
+    els.progressPct.textContent = pctLabel + "%";
+    els.progressEarned.textContent =
+      formatMoney(earned) + " de " + formatMoney(targetAmount);
+    els.progress.classList.remove("is-hidden");
+    els.progress.hidden = false;
+  }
+
+  function syncLoggedTodayVisibility(trackingProgress) {
+    const show = mode === "target" && trackingProgress;
+    els.loggedTodayField.classList.toggle("is-hidden", !show);
+  }
+
   function calculate() {
     const now = new Date();
     const businessDays = businessDaysInMonth(now.getFullYear(), now.getMonth());
@@ -340,6 +402,8 @@
       els.resultLabel.textContent = "Vas a cobrar";
       pulseResult(hours > 0 && rate > 0 ? formatMoney(total) : "—");
       hideHint();
+      hideProgress();
+      syncLoggedTodayVisibility(false);
       return;
     }
 
@@ -347,20 +411,34 @@
     const trackingProgress = hasOptionalValue(els.hoursDone);
     const hoursDone = trackingProgress ? parseNumber(els.hoursDone) : 0;
 
+    syncLoggedTodayVisibility(trackingProgress);
+
     if (!(rate > 0 && target > 0)) {
       els.resultLabel.textContent = "Tenés que trabajar";
       pulseResult("—");
       hideHint();
+      hideProgress();
       return;
     }
 
     const hoursNeeded = target / rate;
     const hoursLeft = Math.max(0, hoursNeeded - hoursDone);
+    const earned = hoursDone * rate;
+
+    if (trackingProgress) {
+      showProgress(earned, target);
+    } else {
+      hideProgress();
+    }
 
     if (hoursLeft <= HOURS_EPSILON) {
       els.resultLabel.textContent = trackingProgress ? "Te faltan" : "Tenés que trabajar";
       pulseResult("0 h");
-      showHint("Ya llegaste al objetivo");
+      if (trackingProgress) {
+        showHint("Ya llegaste al objetivo");
+      } else {
+        hideHint();
+      }
       return;
     }
 
@@ -368,12 +446,14 @@
     pulseResult(formatHours(hoursLeft) + " h");
 
     if (trackingProgress) {
-      const remaining = remainingBusinessDays(now);
+      const remaining = remainingBusinessDays(now, {
+        excludeToday: isLoggedTodayChecked(),
+      });
       if (remaining.count > 0) {
         const perDay = hoursLeft / remaining.count;
-        const todayNote = remaining.includesToday
-          ? "incluye hoy"
-          : "hoy no es hábil";
+        var todayNote = "hoy no es día hábil";
+        if (remaining.fromNextBusinessDay) todayNote = "desde el próximo hábil";
+        else if (remaining.includesToday) todayNote = "incluye hoy";
         showHint(
           formatHours(perDay) + " h por día hábil restante (" + todayNote + ")"
         );
@@ -396,14 +476,16 @@
       if (state.hours != null) els.hours.value = state.hours;
       if (state.hoursDone != null) els.hoursDone.value = state.hoursDone;
       if (state.target != null) els.target.value = state.target;
+      syncLoggedTodayFromState(state);
       setMode(state.mode === "target" ? "target" : "earn");
       return;
     }
 
-    els.rate.value = "15000";
-    els.hours.value = "80";
+    els.rate.value = "";
+    els.hours.value = "";
     els.hoursDone.value = "";
-    els.target.value = "1200000";
+    els.target.value = "";
+    els.loggedToday.checked = false;
     setMode("earn");
   }
 
@@ -438,6 +520,8 @@
   [els.rate, els.hours, els.target, els.hoursDone].forEach(function (input) {
     input.addEventListener("input", onFieldInput);
   });
+
+  els.loggedToday.addEventListener("change", onFieldInput);
 
   const year = new Date().getFullYear();
   const cached = readCachedHolidays(year);

@@ -10,6 +10,9 @@
     monthContext: document.getElementById("monthContext"),
     modeEarn: document.getElementById("modeEarn"),
     modeTarget: document.getElementById("modeTarget"),
+    modeCal: document.getElementById("modeCal"),
+    result: document.getElementById("result"),
+    calendar: document.getElementById("calendar"),
     rate: document.getElementById("rate"),
     hours: document.getElementById("hours"),
     hoursDone: document.getElementById("hoursDone"),
@@ -24,6 +27,7 @@
     progressBar: document.getElementById("progressBar"),
     progressFill: document.getElementById("progressFill"),
     progressEarned: document.getElementById("progressEarned"),
+    calendarGrid: document.getElementById("calendarGrid"),
     panels: document.querySelectorAll("[data-panel]"),
   };
 
@@ -31,6 +35,7 @@
   let saveTimer = null;
   let lastResultText = "";
   const holidayCache = Object.create(null);
+  const holidayNamesCache = Object.create(null);
 
   function easterSunday(year) {
     const a = year % 19;
@@ -111,13 +116,17 @@
 
   function holidaysFromApiPayload(payload) {
     const set = new Set();
-    if (!Array.isArray(payload)) return set;
+    const names = Object.create(null);
+    if (!Array.isArray(payload)) return { set: set, names: names };
     payload.forEach(function (item) {
       if (item && typeof item.fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.fecha)) {
         set.add(item.fecha);
+        if (typeof item.nombre === "string" && item.nombre) {
+          names[item.fecha] = item.nombre;
+        }
       }
     });
-    return set;
+    return { set: set, names: names };
   }
 
   function readCachedHolidays(year) {
@@ -125,8 +134,9 @@
       const raw = localStorage.getItem(HOLIDAYS_STORAGE_PREFIX + year);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      const set = holidaysFromApiPayload(data);
-      return set.size > 0 ? set : null;
+      const parsed = holidaysFromApiPayload(data);
+      if (parsed.set.size === 0) return null;
+      return parsed;
     } catch (err) {
       return null;
     }
@@ -140,19 +150,20 @@
     }
   }
 
-  function setHolidays(year, set) {
+  function setHolidays(year, set, names) {
     holidayCache[year] = set;
+    holidayNamesCache[year] = names || holidayNamesCache[year] || Object.create(null);
   }
 
   function getHolidays(year) {
     if (holidayCache[year]) return holidayCache[year];
     const cached = readCachedHolidays(year);
     if (cached) {
-      holidayCache[year] = cached;
-      return cached;
+      setHolidays(year, cached.set, cached.names);
+      return cached.set;
     }
     const fallback = localHolidaysFallback(year);
-    holidayCache[year] = fallback;
+    setHolidays(year, fallback, Object.create(null));
     return fallback;
   }
 
@@ -169,7 +180,7 @@
   function loadHolidays(year) {
     const previous = holidayCache[year] || null;
     const cached = readCachedHolidays(year);
-    if (cached) setHolidays(year, cached);
+    if (cached) setHolidays(year, cached.set, cached.names);
 
     return fetch(FERIADOS_API + year)
       .then(function (response) {
@@ -177,15 +188,15 @@
         return response.json();
       })
       .then(function (payload) {
-        const set = holidaysFromApiPayload(payload);
-        if (set.size === 0) throw new Error("empty");
+        const parsed = holidaysFromApiPayload(payload);
+        if (parsed.set.size === 0) throw new Error("empty");
         writeCachedHolidays(year, payload);
-        setHolidays(year, set);
-        return { set: set, changed: !holidaysEqual(previous, set) };
+        setHolidays(year, parsed.set, parsed.names);
+        return { set: parsed.set, changed: !holidaysEqual(previous, parsed.set) };
       })
       .catch(function () {
         if (!holidayCache[year]) {
-          setHolidays(year, localHolidaysFallback(year));
+          setHolidays(year, localHolidaysFallback(year), Object.create(null));
         }
         return {
           set: holidayCache[year],
@@ -318,13 +329,25 @@
     saveTimer = setTimeout(saveState, SAVE_DEBOUNCE_MS);
   }
 
+  function normalizeMode(nextMode) {
+    if (nextMode === "target" || nextMode === "cal") return nextMode;
+    return "earn";
+  }
+
   function setMode(nextMode) {
-    mode = nextMode === "target" ? "target" : "earn";
+    mode = normalizeMode(nextMode);
+    const onCal = mode === "cal";
 
     els.modeEarn.classList.toggle("is-active", mode === "earn");
     els.modeTarget.classList.toggle("is-active", mode === "target");
+    els.modeCal.classList.toggle("is-active", onCal);
     els.modeEarn.setAttribute("aria-selected", mode === "earn" ? "true" : "false");
     els.modeTarget.setAttribute("aria-selected", mode === "target" ? "true" : "false");
+    els.modeCal.setAttribute("aria-selected", onCal ? "true" : "false");
+
+    els.form.classList.toggle("is-hidden", onCal);
+    els.result.classList.toggle("is-hidden", onCal);
+    els.calendar.classList.toggle("is-hidden", !onCal);
 
     els.panels.forEach(function (panel) {
       const show = panel.getAttribute("data-panel") === mode;
@@ -396,6 +419,12 @@
     const businessDays = businessDaysInMonth(now.getFullYear(), now.getMonth());
     const rate = parseNumber(els.rate);
 
+    if (mode === "cal") {
+      syncLoggedTodayVisibility(false);
+      renderCalendar();
+      return;
+    }
+
     if (mode === "earn") {
       const hours = parseNumber(els.hours);
       const total = rate * hours;
@@ -404,6 +433,7 @@
       hideHint();
       hideProgress();
       syncLoggedTodayVisibility(false);
+      renderCalendar();
       return;
     }
 
@@ -412,6 +442,7 @@
     const hoursDone = trackingProgress ? parseNumber(els.hoursDone) : 0;
 
     syncLoggedTodayVisibility(trackingProgress);
+    renderCalendar();
 
     if (!(rate > 0 && target > 0)) {
       els.resultLabel.textContent = "Tenés que trabajar";
@@ -477,7 +508,7 @@
       if (state.hoursDone != null) els.hoursDone.value = state.hoursDone;
       if (state.target != null) els.target.value = state.target;
       syncLoggedTodayFromState(state);
-      setMode(state.mode === "target" ? "target" : "earn");
+      setMode(normalizeMode(state.mode));
       return;
     }
 
@@ -489,11 +520,79 @@
     setMode("earn");
   }
 
+  function renderCalendar() {
+    const now = startOfLocalDay(new Date());
+    const year = now.getFullYear();
+    const monthIndex = now.getMonth();
+    const holidays = getHolidays(year);
+    const names = holidayNamesCache[year] || Object.create(null);
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const firstWeekday = new Date(year, monthIndex, 1).getDay();
+    const mondayOffset = (firstWeekday + 6) % 7;
+    const trackingProgress = hasOptionalValue(els.hoursDone);
+    const excludeToday = trackingProgress && isLoggedTodayChecked();
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < mondayOffset; i++) {
+      const spacer = document.createElement("span");
+      spacer.className = "cal__day is-empty";
+      spacer.setAttribute("aria-hidden", "true");
+      fragment.appendChild(spacer);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, monthIndex, day);
+      const key = toKey(date);
+      const work = isBusinessDay(date, holidays);
+      const isToday = day === now.getDate();
+      const isPast = date < now || (isToday && excludeToday);
+      const cell = document.createElement("span");
+      const label = String(day);
+      cell.className = "cal__day";
+      cell.textContent = label;
+      cell.classList.toggle("is-work", work);
+      cell.classList.toggle("is-off", !work);
+      cell.classList.toggle("is-today", isToday);
+      cell.classList.toggle("is-past", isPast && !isToday);
+      cell.classList.toggle(
+        "is-remaining",
+        trackingProgress && work && !isPast && !isToday
+      );
+
+      if (isToday) {
+        cell.setAttribute("aria-current", "date");
+      }
+
+      if (!work && names[key]) {
+        cell.title = names[key];
+        cell.setAttribute(
+          "aria-label",
+          label + (isToday ? ", hoy, " : ", ") + names[key]
+        );
+      } else if (work) {
+        cell.setAttribute(
+          "aria-label",
+          label + (isToday ? ", hoy, día hábil" : ", día hábil")
+        );
+      } else {
+        cell.setAttribute(
+          "aria-label",
+          label + (isToday ? ", hoy, no hábil" : ", no hábil")
+        );
+      }
+
+      fragment.appendChild(cell);
+    }
+
+    els.calendarGrid.replaceChildren(fragment);
+  }
+
   function initMonthContext() {
     const now = new Date();
     const days = businessDaysInMonth(now.getFullYear(), now.getMonth());
     els.monthContext.textContent =
       formatMonthLabel(now) + " · " + days + " días hábiles";
+    renderCalendar();
   }
 
   function refreshCalendarDependentUi() {
@@ -516,6 +615,9 @@
   els.modeTarget.addEventListener("click", function () {
     setMode("target");
   });
+  els.modeCal.addEventListener("click", function () {
+    setMode("cal");
+  });
 
   [els.rate, els.hours, els.target, els.hoursDone].forEach(function (input) {
     input.addEventListener("input", onFieldInput);
@@ -526,12 +628,13 @@
   const year = new Date().getFullYear();
   const cached = readCachedHolidays(year);
   if (cached) {
-    setHolidays(year, cached);
+    setHolidays(year, cached.set, cached.names);
     initMonthContext();
   } else {
-    setHolidays(year, localHolidaysFallback(year));
+    setHolidays(year, localHolidaysFallback(year), Object.create(null));
     els.monthContext.textContent =
       formatMonthLabel(new Date()) + " · …";
+    renderCalendar();
   }
 
   applyDefaults(loadState());

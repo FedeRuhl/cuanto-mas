@@ -19,7 +19,7 @@ Si cargás las **horas ya trabajadas** (opcional):
 - Podés marcar **«Ya anoté las horas de hoy»** para que el promedio arranque desde el próximo hábil
 - Ves el **progreso del mes** (% y monto acumulado vs. objetivo)
 
-Los días hábiles son lunes a viernes, menos feriados nacionales argentinos (incluye trasladables y puentes cuando la API los trae).
+Los días hábiles son lunes a viernes, menos feriados nacionales argentinos (incluye trasladables y puentes cuando la API los trae). En la pestaña **Calendario** hay un calendario: hábil, no hábil y hoy. Si cargaste horas ya trabajadas, también se marcan los días hábiles que quedan.
 
 ## Cómo usarla
 

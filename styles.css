@@ -100,12 +100,129 @@ body {
   letter-spacing: 0.01em;
 }
 
+.cal {
+  margin: 0;
+  animation: riseIn 0.55s var(--ease) both;
+}
+
+.cal.is-hidden {
+  display: none;
+}
+
+.cal__weekdays,
+.cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.28rem;
+}
+
+.cal__weekdays {
+  margin-bottom: 0.35rem;
+}
+
+.cal__weekdays span {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  opacity: 0.75;
+}
+
+.cal__day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, white 35%, transparent);
+  opacity: 0.45;
+}
+
+.cal__day.is-empty {
+  background: transparent;
+  opacity: 1;
+}
+
+.cal__day.is-work {
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--glow) 55%, white);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.cal__day.is-off {
+  opacity: 0.38;
+}
+
+.cal__day.is-past.is-work {
+  opacity: 0.55;
+}
+
+.cal__day.is-remaining {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.cal__day.is-today {
+  opacity: 1;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.cal__day.is-today.is-work {
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--glow) 55%, white);
+}
+
+.cal__day.is-today.is-off {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, white 35%, transparent);
+}
+
+.cal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.cal__swatch {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.2rem;
+  border-radius: 0.2rem;
+  vertical-align: -0.05rem;
+}
+
+.cal__swatch--work {
+  background: color-mix(in srgb, var(--glow) 55%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.cal__swatch--off {
+  background: color-mix(in srgb, var(--ink) 12%, white);
+}
+
+.cal__swatch--today {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
 .modes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.3rem;
   margin-bottom: 1.75rem;
-  padding: 0.35rem;
+  padding: 0.3rem;
   background: color-mix(in srgb, white 55%, transparent);
   border-radius: 999px;
   backdrop-filter: blur(8px);
@@ -115,13 +232,14 @@ body {
   appearance: none;
   border: 0;
   border-radius: 999px;
-  padding: 0.7rem 0.85rem;
+  padding: 0.65rem 0.4rem;
   font: inherit;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--ink-soft);
   background: transparent;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     background 0.35s var(--ease),
     color 0.35s var(--ease),
@@ -147,6 +265,10 @@ body {
   flex-direction: column;
   gap: 1.15rem;
   margin-bottom: 2rem;
+}
+
+.form.is-hidden {
+  display: none;
 }
 
 .field {
@@ -261,6 +383,10 @@ input[type="number"]:focus {
 .result {
   min-height: 7.5rem;
   animation: riseIn 0.85s var(--ease) 0.12s both;
+}
+
+.result.is-hidden {
+  display: none;
 }
 
 .result__label {

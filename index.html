@@ -22,7 +22,7 @@
 
       <p class="month" id="monthContext"></p>
 
-      <div class="modes" role="tablist" aria-label="Modo de cálculo">
+      <div class="modes" role="tablist" aria-label="Vista">
         <button
           type="button"
           class="modes__btn is-active"
@@ -42,6 +42,16 @@
           id="modeTarget"
         >
           Cuánto trabajar
+        </button>
+        <button
+          type="button"
+          class="modes__btn"
+          role="tab"
+          aria-selected="false"
+          data-mode="cal"
+          id="modeCal"
+        >
+          Calendario
         </button>
       </div>
 
@@ -107,7 +117,7 @@
         </label>
       </form>
 
-      <section class="result" aria-live="polite">
+      <section class="result" id="result" aria-live="polite">
         <p class="result__label" id="resultLabel">Vas a cobrar</p>
         <p class="result__value" id="resultValue">—</p>
         <p class="result__hint is-hidden" id="resultHint"></p>
@@ -129,6 +139,18 @@
           </div>
           <p class="progress__earned" id="progressEarned"></p>
         </div>
+      </section>
+
+      <section class="cal is-hidden" id="calendar" aria-label="Días hábiles del mes">
+        <div class="cal__weekdays" aria-hidden="true">
+          <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+        </div>
+        <div class="cal__grid" id="calendarGrid"></div>
+        <p class="cal__legend">
+          <span class="cal__swatch cal__swatch--work"></span> hábil
+          <span class="cal__swatch cal__swatch--off"></span> no hábil
+          <span class="cal__swatch cal__swatch--today"></span> hoy
+        </p>
       </section>
     </main>
 

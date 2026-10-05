@@ -19,7 +19,7 @@ Si cargás las **horas ya trabajadas** (opcional):
 - Podés marcar **«Ya anoté las horas de hoy»** para que el promedio arranque desde el próximo hábil
 - Ves el **progreso del mes** (% y monto acumulado vs. objetivo)
 
-Los días hábiles son lunes a viernes, menos feriados nacionales argentinos (incluye trasladables y puentes cuando la API los trae). En la pestaña **Calendario** hay un calendario: hábil, no hábil y hoy. Si cargaste horas ya trabajadas, también se marcan los días hábiles que quedan.
+Los días hábiles son lunes a viernes, menos feriados **nacionales**, **provinciales de Entre Ríos** y **municipales de Paraná**. En la pestaña **Calendario** se ven: hábil, no hábil y hoy. Si cargaste horas ya trabajadas, también se marcan los días hábiles que quedan.
 
 ## Cómo usarla
 
@@ -54,13 +54,23 @@ No hay cuenta ni servidor: todo queda en tu dispositivo.
 
 ## Feriados
 
-Se consultan en [ArgentinaDatos](https://argentinadatos.com/docs/operations/get-feriados):
+**Nacionales** desde [ArgentinaDatos](https://argentinadatos.com/docs/operations/get-feriados):
 
 ```
 GET https://api.argentinadatos.com/v1/feriados/{año}
 ```
 
 Se cachean localmente. Si la API no responde, se usa un cálculo local de respaldo (feriados fijos, Pascua/Carnaval y trasladables según la Ley 27.399; sin puentes turísticos futuros).
+
+**Provinciales (Entre Ríos)** — fijos en la app:
+
+- 3 de febrero — Batalla de Caseros (Ley 7285)
+- 27 de junio — Día del Trabajador Estatal (Decreto 216/03; en 2026 adelantado al 26/6)
+- 29 de septiembre — San Miguel Arcángel (Decreto 4359/93)
+
+**Municipal (Paraná)**:
+
+- 7 de octubre — Nuestra Señora del Rosario
 
 ## Requisitos
 

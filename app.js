@@ -114,6 +114,44 @@
     return set;
   }
 
+  function localHolidaysForYear(year) {
+    const set = new Set();
+    const names = Object.create(null);
+
+    function add(month, day, name) {
+      const key = toKey(new Date(year, month - 1, day));
+      set.add(key);
+      names[key] = name;
+    }
+
+    add(2, 3, "Batalla de Caseros (Entre Ríos)");
+    add(9, 29, "San Miguel Arcángel (Entre Ríos)");
+    add(10, 7, "Nuestra Señora del Rosario (Paraná)");
+
+    if (year === 2026) {
+      add(6, 26, "Día del Trabajador Estatal (Entre Ríos)");
+    } else {
+      add(6, 27, "Día del Trabajador Estatal (Entre Ríos)");
+    }
+
+    return { set: set, names: names };
+  }
+
+  function mergeLocalHolidays(year, set, names) {
+    const local = localHolidaysForYear(year);
+    const mergedSet = new Set(set);
+    const mergedNames = Object.assign(Object.create(null), names || {});
+
+    local.set.forEach(function (fecha) {
+      mergedSet.add(fecha);
+    });
+    Object.keys(local.names).forEach(function (fecha) {
+      if (!mergedNames[fecha]) mergedNames[fecha] = local.names[fecha];
+    });
+
+    return { set: mergedSet, names: mergedNames };
+  }
+
   function holidaysFromApiPayload(payload) {
     const set = new Set();
     const names = Object.create(null);
@@ -151,8 +189,9 @@
   }
 
   function setHolidays(year, set, names) {
-    holidayCache[year] = set;
-    holidayNamesCache[year] = names || holidayNamesCache[year] || Object.create(null);
+    const merged = mergeLocalHolidays(year, set, names);
+    holidayCache[year] = merged.set;
+    holidayNamesCache[year] = merged.names;
   }
 
   function getHolidays(year) {
@@ -160,11 +199,11 @@
     const cached = readCachedHolidays(year);
     if (cached) {
       setHolidays(year, cached.set, cached.names);
-      return cached.set;
+      return holidayCache[year];
     }
     const fallback = localHolidaysFallback(year);
     setHolidays(year, fallback, Object.create(null));
-    return fallback;
+    return holidayCache[year];
   }
 
   function holidaysEqual(a, b) {
@@ -192,7 +231,10 @@
         if (parsed.set.size === 0) throw new Error("empty");
         writeCachedHolidays(year, payload);
         setHolidays(year, parsed.set, parsed.names);
-        return { set: parsed.set, changed: !holidaysEqual(previous, parsed.set) };
+        return {
+          set: holidayCache[year],
+          changed: !holidaysEqual(previous, holidayCache[year]),
+        };
       })
       .catch(function () {
         if (!holidayCache[year]) {
@@ -473,13 +515,15 @@
       return;
     }
 
-    els.resultLabel.textContent = trackingProgress ? "Te faltan" : "Tenés que trabajar";
-    pulseResult(formatHours(hoursLeft) + " h");
-
     if (trackingProgress) {
       const remaining = remainingBusinessDays(now, {
         excludeToday: isLoggedTodayChecked(),
       });
+      const daysLabel =
+        remaining.count === 1 ? "1 día" : remaining.count + " días";
+      els.resultLabel.textContent = "Te faltan, en " + daysLabel;
+      pulseResult(formatHours(hoursLeft) + " h");
+
       if (remaining.count > 0) {
         const perDay = hoursLeft / remaining.count;
         var todayNote = "hoy no es día hábil";
@@ -493,6 +537,9 @@
       }
       return;
     }
+
+    els.resultLabel.textContent = "Tenés que trabajar";
+    pulseResult(formatHours(hoursLeft) + " h");
 
     if (businessDays > 0) {
       showHint(formatHours(hoursLeft / businessDays) + " h por día hábil");
